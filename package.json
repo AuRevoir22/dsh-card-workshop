@@ -35,6 +35,7 @@
     "lib",
     "locale",
     "icon.svg",
+    "docs",
     "README.md",
     "LICENSE"
   ],
