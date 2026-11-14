@@ -4,7 +4,7 @@
 //    客户端 listDirectory 一律被拒，所以列目录这件事由这里用 node:fs 自己做。
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { join, normalize, sep } from 'node:path'
-import { DEFAULT_ROOT, listFolders, prepare, renderPageImages } from './lib/prepare.js'
+import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
 
 export const name = 'card-workshop'
@@ -310,8 +310,31 @@ const pageImageTool = {
   },
 }
 
+const cleanupTool = {
+  name: 'cards_cleanup',
+  description:
+    '清掉母文件夹 .work 下的批次中间产物。成品 PDF 在子文件夹里，删中间产物不影响它。默认清全部批次；传 hours 只清那么久没动过的（比如 12）。正在被别的会话使用的批次会自动跳过，不会删坏。重编之前别跑到它。',
+  parameters: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      root: str('母文件夹绝对路径，默认 D:\\卡片库'),
+      hours: { type: 'integer', description: '只清这么多小时没动过的批次；默认 0，也就是清掉 5 分钟以上没动过的全部' },
+    },
+  },
+  timeoutMs: 60000,
+  output: {
+    schema: OUTPUT,
+    render: (_a, v) => text(v.removed.length ? `清掉 ${v.removed.length} 个批次：\n- ${v.removed.join('\n- ')}` : '没有可清的批次，.work 已经是干净的'),
+  },
+  async execute(args) {
+    const removed = sweepOldBatches(args.root || DEFAULT_ROOT, args.hours ?? 0)
+    return { ok: true, removed }
+  },
+}
+
 export function apply(ctx) {
-  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool]) {
+  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool]) {
     ctx.effect(() => ctx.tools.register(tool))
   }
   ctx.effect(() =>
