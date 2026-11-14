@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Card workshop",
+    "description": "Splits a textbook or exam PDF into definition, theorem, and problem-type cards, renders them as one card PDF, and files it under a subfolder of the card library."
+  }
+}

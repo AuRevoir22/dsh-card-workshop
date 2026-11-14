@@ -1,0 +1,3 @@
+- insert:
+    - id: card-workshop
+      name: '@local/card-workshop'

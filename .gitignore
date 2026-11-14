@@ -1,0 +1,7 @@
+node_modules/
+.work/
+*.pdf
+*.aux
+*.log
+*.synctex.gz
+.DS_Store

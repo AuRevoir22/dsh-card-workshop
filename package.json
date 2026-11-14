@@ -1,0 +1,53 @@
+{
+  "name": "dsh-card-workshop",
+  "version": "0.1.0",
+  "private": false,
+  "description": "把教材或试卷 PDF 拆成定义卡、定理卡、题型卡，编成一份卡片 PDF。A DSH desktop plugin that turns a PDF into definition, theorem, and problem-type cards.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "pdf",
+    "cards",
+    "latex",
+    "education"
+  ],
+  "license": "MIT",
+  "author": "YW2",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AuRevoir22/dsh-card-workshop.git"
+  },
+  "homepage": "https://github.com/AuRevoir22/dsh-card-workshop#readme",
+  "bugs": {
+    "url": "https://github.com/AuRevoir22/dsh-card-workshop/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}
