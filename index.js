@@ -339,7 +339,8 @@ const cleanupTool = {
 const courseTool = {
   name: 'cards_course',
   description:
-    '读写一个科目的教材与进度，存成 <母文件夹>/<科目>/课程.json。每份文件开工前都要确认一次范围：第一次问教材（书名+版次）并自己上网查目录，之后每次只问「这次做到第几章第几节」，答了就用 set 更新 current。prepare 会把「该章节及之前」当成解题可用的知识范围。',
+    '读写一个科目的教材与进度，存成 <母文件夹>/<科目>/课程.json。**用户一报出教材，就立刻上网查这本教材的完整目录（要细到 x.y.z 小目）、贴给用户核对、然后 set 写进去**——别等到拆页才问，目录不全会让后面所有范围判断都出错。之后每份文件只需确认「这次做到哪一节」，用 set 更新 current 即可。',
+
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -367,8 +368,9 @@ const courseTool = {
     if (!subject) return { ok: false, message: '要给科目名（一级目录）' }
     if (args.action === 'get') {
       const c = readCourse(root, subject)
-      if (!c.found) return { ok: false, message: `${subject} 还没有 课程.json（${c.file || ''}）${c.reason ? '：' + c.reason : ''}` }
-      return { ok: true, message: `${subject}：${c.textbook || '（没写教材）'}\n范围：${scopeText(c)}` }
+      if (!c.found) return { ok: false, message: `${subject} 还没有 课程.json（${c.file || ''}）${c.reason ? '：' + c.reason : ''}。先问用户教材，再去查目录。` }
+      const coarse = !(c.chapters || []).some((x) => /^§?\s*\d+\.\d+\.\d+/.test(String(x).trim()))
+      return { ok: true, message: `${subject}：${c.textbook || '（没写教材）'}\n范围：${scopeText(c)}${coarse ? '\n⚠ 目录只到 §x.y，缺 x.y.z 小目——先补全再算范围' : ''}` }
     }
     const prev = readCourse(root, subject)
     const data = {
