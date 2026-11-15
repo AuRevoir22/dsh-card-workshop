@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { basename, join, normalize } from 'node:path'
 import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
-import { readCourse, scopeText, writeCourse } from './lib/course.js'
+import { readCourse, scopeText, validateCourse, writeCourse } from './lib/course.js'
 import { auditFile, collectPdfs } from './lib/audit.js'
 
 export const name = 'card-workshop'
@@ -349,9 +349,11 @@ const courseTool = {
       subject: str('科目名，也就是母文件夹下的一级目录，例如「高等数学分析」'),
       root: str('母文件夹绝对路径，默认 D:\\卡片库'),
       textbook: str('参考教材，书名 + 版次，例如「《数学分析》陈纪修 第三版」'),
-      chapters: { type: 'array', items: { type: 'string' }, description: '教材章节目录，按顺序' },
-      current: { type: 'object', description: '这次做到哪里：{"chapter":"第二章 函数极限","section":"2.3 无穷小量与无穷大量"}' },
+      chapters: { type: 'array', items: { type: 'string' }, description: '教材目录，按顺序平铺，细到「2.3.3 Taylor定理」这一级。粗到 §x.y 会把藏在节里的内容误判成越界' },
+      current: { type: 'object', description: '这次做到哪里：{"chapter":"第二章 一元函数微分学","section":"§2.3.3 Taylor定理"}' },
       forbidden: { type: 'array', items: { type: 'string' }, description: '明确还不许用的方法，例如 ["泰勒展开","洛必达法则"]' },
+      source: str('目录从哪来的：网址，或「用户贴的」'),
+      accept: { type: 'array', items: { type: 'string' }, description: '复检时确认不是越界的词，写进来长期豁免' },
     },
   },
   timeoutMs: 20000,
@@ -374,13 +376,14 @@ const courseTool = {
       chapters: Array.isArray(args.chapters) && args.chapters.length ? args.chapters : prev.chapters || [],
       current: args.current || prev.current || {},
       forbidden: Array.isArray(args.forbidden) ? args.forbidden : prev.forbidden || [],
+      accept: Array.isArray(args.accept) ? args.accept : prev.accept || [],
+      source: args.source || (prev.found ? prev.source : '') || '',
       updatedAt: new Date().toISOString(),
     }
-    if (!data.textbook || !data.chapters.length || !data.current || !data.current.chapter) {
-      return { ok: false, message: 'textbook、chapters、current.chapter 三样都要有，缺的补上再写' }
-    }
+    const v = validateCourse(data)
+    if (v.errors.length) return { ok: false, message: '没写进去，先修这几处：\n- ' + v.errors.join('\n- ') }
     const file = writeCourse(root, subject, data)
-    return { ok: true, message: `写好了：${file}\n${scopeText({ found: true, ...data })}` }
+    return { ok: true, message: `写好了：${file}\n${scopeText({ found: true, ...data })}${v.warnings.length ? '\n提醒：\n- ' + v.warnings.join('\n- ') : ''}` }
   },
 }
 
