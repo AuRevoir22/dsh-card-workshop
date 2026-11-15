@@ -7,7 +7,7 @@ import { basename, join, normalize } from 'node:path'
 import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
 import { readCourse, scopeText, writeCourse } from './lib/course.js'
-import { collectPdfs, courseForPath, pdfPages, scanPages, scopeWords } from './lib/audit.js'
+import { auditFile, collectPdfs } from './lib/audit.js'
 
 export const name = 'card-workshop'
 export const inject = ['tools', 'webServer']
@@ -441,6 +441,8 @@ const auditTool = {
       root: str('母文件夹绝对路径，默认 D:\\卡片库（用来定位科目和课程设置）'),
       forbidden: { type: 'array', items: { type: 'string' }, description: '临时补几个禁用词，比如 ["定积分"]' },
       builtin: { type: 'boolean', description: '是否带上内置的常见后续话题词表，默认 true' },
+      until: str('老文件没有范围快照时，手工给个当时的口径，例如「§2.3 微分学基本定理及其应用」'),
+      accept: { type: 'array', items: { type: 'string' }, description: '词表里误报的词，传进来就不再报，例如 ["中值定理"]' },
     },
   },
   timeoutMs: 180000,
@@ -448,7 +450,7 @@ const auditTool = {
     schema: OUTPUT,
     render: (_a, v) => text(v.ok
       ? (v.files.length
-        ? v.files.map((f) => `${f.name}${f.subject ? `（科目：${f.subject}）` : ''}\n${f.hits.length ? f.hits.map((h) => `  · 「${h.word}」出现在第 ${h.pages.join('、')} 页${h.sample ? `　例：${h.sample}` : ''}`).join('\n') : '  没扫到越界词'}`).join('\n\n')
+        ? v.files.map((f) => `${f.name}　范围：${f.scope}（${f.from === 'snapshot' ? '生成时的快照' : f.from === 'override' ? '你给的口径' : '当前课程设置'}）\n${f.hits.length ? f.hits.map((h) => `  · 「${h.word}」${h.kind === 'builtin' ? '（疑似，词表兜底）' : ''} 第 ${h.pages.join('、')} 页${h.sample ? `　例：${h.sample}` : ''}`).join('\n') : '  没扫到越界词'}`).join('\n\n')
         : '没有可扫的 PDF')
       : '扫不了：' + v.message),
   },
@@ -458,11 +460,7 @@ const auditTool = {
     if (!pdfs.length) return { ok: true, files: [] }
     const out = []
     for (const pdf of pdfs.slice(0, 20)) {
-      const { subject, course } = courseForPath(root, pdf)
-      const base = course.found ? { ...course } : {}
-      const words = scopeWords({ ...base, forbidden: [...(base.forbidden || []), ...(args.forbidden || [])] }, { builtin: args.builtin !== false })
-      const pages = await pdfPages(pdf)
-      out.push({ name: basename(pdf), subject: course.found ? subject : '', hits: scanPages(pages, words) })
+      out.push(await auditFile(root, pdf, { forbidden: args.forbidden || [], builtin: args.builtin !== false, until: args.until, accept: args.accept || [] }))
     }
     return { ok: true, files: out }
   },
