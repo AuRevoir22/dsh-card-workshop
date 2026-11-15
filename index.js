@@ -40,7 +40,7 @@ const prepareTool = {
     render: (_a, v) => text(
       v.ok
         ? (v.textUsable ? '' : `⚠ 文字层不可用：${v.brokenPages}/${v.totalPages} 页抽出来是乱码（字体没带 ToUnicode）。已按整本出图，pages/*.md 别读，直接 read_image img/page-XXX.png。\n`) +
-          `批次 ${v.batch}：${v.totalPages} 页（扫描页 ${v.scannedPages}，出图 ${v.imagePages} 页），目标 ${v.targetPath}${v.created ? '（新建）' : ''}。\n施工单：${v.plan}\n正文 ${v.charCount} 字符（原始 ${v.rawCharCount}，压掉 ${Math.round((1 - v.charCount / Math.max(1, v.rawCharCount)) * 100)}%），分 ${v.parts.length} 段。\n脱敏：${v.redactions.map((r) => r.kind + '×' + r.count).join('、') || '无命中'}`
+          `批次 ${v.batch}：${v.totalPages} 页（扫描页 ${v.scannedPages}，出图 ${v.imagePages} 页），目标 ${v.targetPath}${v.created ? '（新建）' : ''}。\n施工单：${v.plan}\n**开工前先问用户：这次做到第几章第几节**${v.course.found ? `（上次记的是「${v.course.last || '没写'}」）` : '（这个科目还没设教材，先问教材）'}，确认后用 cards_course 更新。\n正文 ${v.charCount} 字符（原始 ${v.rawCharCount}，压掉 ${Math.round((1 - v.charCount / Math.max(1, v.rawCharCount)) * 100)}%），分 ${v.parts.length} 段。\n脱敏：${v.redactions.map((r) => r.kind + '×' + r.count).join('、') || '无命中'}`
         : `没准备好：${v.message || v.code}${v.suggestions?.length ? '；母文件夹里相近的：' + v.suggestions.join('、') : ''}${v.ask ? '。' + v.ask : ''}`,
     ),
   },

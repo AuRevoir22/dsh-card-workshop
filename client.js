@@ -273,7 +273,7 @@ window.__ModuleLoader__.load({
           '目标子文件夹：' + (target || '（未选）'),
           '源文件：' + (picked.length ? picked.join('；') : '（未选）'),
           '',
-          '按卡片工坊流程走：cards_prepare 拆页 → 读 .work/<批次>/plan.md 按段施工（一段读完立刻写 parts/NN.json）→ cards_check → cards_build。题型卡每题给切入点和完整详解，成品不写来源页码、不做核对表。开工前用任务清单把各段列上，全部做完挨个标完成，别留尾巴。',
+          '按卡片工坊流程走：cards_prepare 拆页 → **先问这次做到第几章第几节并用 cards_course 记下** → 读 plan.md 按段施工（一段读完立刻写 parts/NN.json）→ cards_build 带 reviewed:"all"。题型卡每段给识别/思路/易错，每题给识别/思路/步骤。开工前用任务清单把各段列上，做完挨个标完成。',
         ].join('\n')
 
         function start() {
