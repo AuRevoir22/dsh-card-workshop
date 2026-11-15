@@ -19,7 +19,7 @@ const OUTPUT = { type: 'object', additionalProperties: true }
 const prepareTool = {
   name: 'cards_prepare',
   description:
-    '卡片工坊第一步：拆页、脱敏，文字压掉空格后按 10 页一段写进 .work/<批次>/pages/，页图只给扫描页和乱码页出。返回批次号，并写好 plan.md——先读它再动手。目标子文件夹不存在时返回 ok:false 和候选名，先问用户打错了还是新建，得到答复再带 create:true 重跑。',
+    '卡片工坊第一步：拆页、脱敏，文字压掉空格后按 10 页一段写进 .work/<批次>/pages/，页图只给扫描页和乱码页出。返回批次号，并写好 plan.md——先读它，再按里面的要求问用户这次的知识范围，然后才动手。目标子文件夹不存在时返回 ok:false 和候选名，先问用户打错了还是新建，得到答复再带 create:true 重跑。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -338,7 +338,7 @@ const cleanupTool = {
 const courseTool = {
   name: 'cards_course',
   description:
-    '读写一个科目的教材与进度，存成 <母文件夹>/<科目>/课程.json。首次给某个科目生成卡片时，先问用户参考教材（书名+版次），自己去网上查目录，再问做到第几章第几节，然后用 set 写进来。之后 prepare 会把「该章节及之前」当成解题可用的知识范围。',
+    '读写一个科目的教材与进度，存成 <母文件夹>/<科目>/课程.json。每份文件开工前都要确认一次范围：第一次问教材（书名+版次）并自己上网查目录，之后每次只问「这次做到第几章第几节」，答了就用 set 更新 current。prepare 会把「该章节及之前」当成解题可用的知识范围。',
   parameters: {
     type: 'object',
     additionalProperties: false,
