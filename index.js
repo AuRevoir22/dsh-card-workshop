@@ -7,6 +7,7 @@ import { basename, join, normalize } from 'node:path'
 import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
 import { readCourse, scopeText, writeCourse } from './lib/course.js'
+import { collectPdfs, courseForPath, pdfPages, scanPages, scopeWords } from './lib/audit.js'
 
 export const name = 'card-workshop'
 export const inject = ['tools', 'webServer']
@@ -427,8 +428,48 @@ const rebuildTool = {
   },
 }
 
+const auditTool = {
+  name: 'cards_audit',
+  description:
+    '越界复检，不花 token：直接扫成品 PDF 的文字层，看有没有用到「后面章节」的内容。词表来自课程里的 forbidden、后续章节标题、以及一份常见的后续话题兜底表。可以传单个 PDF、也可以传子文件夹一次扫完。命中的会给页码和上下文，让用户判断是不是真越界。',
+  parameters: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['path'],
+    properties: {
+      path: str('成品 PDF 或子文件夹的绝对路径'),
+      root: str('母文件夹绝对路径，默认 D:\\卡片库（用来定位科目和课程设置）'),
+      forbidden: { type: 'array', items: { type: 'string' }, description: '临时补几个禁用词，比如 ["定积分"]' },
+      builtin: { type: 'boolean', description: '是否带上内置的常见后续话题词表，默认 true' },
+    },
+  },
+  timeoutMs: 180000,
+  output: {
+    schema: OUTPUT,
+    render: (_a, v) => text(v.ok
+      ? (v.files.length
+        ? v.files.map((f) => `${f.name}${f.subject ? `（科目：${f.subject}）` : ''}\n${f.hits.length ? f.hits.map((h) => `  · 「${h.word}」出现在第 ${h.pages.join('、')} 页${h.sample ? `　例：${h.sample}` : ''}`).join('\n') : '  没扫到越界词'}`).join('\n\n')
+        : '没有可扫的 PDF')
+      : '扫不了：' + v.message),
+  },
+  async execute(args) {
+    const root = args.root || DEFAULT_ROOT
+    const pdfs = collectPdfs(args.path)
+    if (!pdfs.length) return { ok: true, files: [] }
+    const out = []
+    for (const pdf of pdfs.slice(0, 20)) {
+      const { subject, course } = courseForPath(root, pdf)
+      const base = course.found ? { ...course } : {}
+      const words = scopeWords({ ...base, forbidden: [...(base.forbidden || []), ...(args.forbidden || [])] }, { builtin: args.builtin !== false })
+      const pages = await pdfPages(pdf)
+      out.push({ name: basename(pdf), subject: course.found ? subject : '', hits: scanPages(pages, words) })
+    }
+    return { ok: true, files: out }
+  },
+}
+
 export function apply(ctx) {
-  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool, courseTool, rebuildTool]) {
+  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool, courseTool, rebuildTool, auditTool]) {
     ctx.effect(() => ctx.tools.register(tool))
   }
   ctx.effect(() =>
