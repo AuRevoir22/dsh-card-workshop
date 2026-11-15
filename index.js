@@ -2,8 +2,8 @@
 // 1. 三个工具：cards_prepare 拆页脱敏、cards_list_folders 列子文件夹、cards_build 排版出 PDF
 // 2. /card-workshop/api/*：给面板用的文件接口。本机的目录选择器只编了 native 一种实现，
 //    客户端 listDirectory 一律被拒，所以列目录这件事由这里用 node:fs 自己做。
-import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
-import { join, normalize, sep } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { basename, join, normalize } from 'node:path'
 import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
 import { readCourse, scopeText, writeCourse } from './lib/course.js'
@@ -383,8 +383,52 @@ const courseTool = {
   },
 }
 
+const rebuildTool = {
+  name: 'cards_rebuild',
+  description:
+    '拿成品旁边的结构快照重编，不读 PDF、不花阅读成本。每份成品都会留 <成品名>.deck.json 和 <成品名>.manifest.json；要改内容就编辑 deck.json，再跑这个，默认覆盖同名 PDF。适合换版式、补字段、改文案这类不需要重读原文的修改。',
+  parameters: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['deckPath'],
+    properties: {
+      deckPath: str('成品旁边的 deck 快照路径，例如 D:\\卡片库\\高数\\第一章\\第一章-20261115-120000.deck.json'),
+      keepVersions: { type: 'boolean', description: '另存一份而不是覆盖同名 PDF，默认 false' },
+    },
+  },
+  timeoutMs: 600000,
+  output: {
+    schema: OUTPUT,
+    render: (_a, v) => text(
+      v.ok
+        ? `重编好了：${v.pdf}（${v.pages} 页）\n定义 ${v.counts.definitions} · 定理 ${v.counts.theorems} · 题型 ${v.counts.types} · 题目 ${v.counts.problems}${v.warnings?.length ? '\n提醒：\n- ' + v.warnings.join('\n- ') : ''}`
+        : `没编成：${v.message}${v.errors?.length ? '\n' + v.errors.slice(0, 8).map((e) => '- ' + e).join('\n') : ''}${v.log ? '\n' + v.log : ''}`,
+    ),
+  },
+  async execute(args) {
+    const deckPath = String(args.deckPath || '')
+    if (!existsSync(deckPath)) return { ok: false, message: '没有这个 deck：' + deckPath }
+    const stem = deckPath.replace(/\.deck\.json$/i, '')
+    const manFile = stem + '.manifest.json'
+    if (!existsSync(manFile)) return { ok: false, message: '找不到配套的 ' + basename(manFile) + '，没法确定落盘位置和页数' }
+    let manifest
+    try {
+      manifest = JSON.parse(readFileSync(manFile, 'utf8'))
+    } catch (e) {
+      return { ok: false, message: 'manifest 读不出来：' + e.message }
+    }
+    if (!manifest.root || !manifest.targetPath) return { ok: false, message: 'manifest 里缺 root 或 targetPath' }
+    const batch = `rebuild-${Date.now().toString(36)}`
+    const work = join(manifest.root, '.work', batch)
+    mkdirSync(work, { recursive: true })
+    writeFileSync(join(work, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8')
+    writeFileSync(join(work, 'deck.json'), readFileSync(deckPath))
+    return build({ root: manifest.root, batch, reviewed: 'all', keepVersions: Boolean(args.keepVersions) })
+  },
+}
+
 export function apply(ctx) {
-  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool, courseTool]) {
+  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool, courseTool, rebuildTool]) {
     ctx.effect(() => ctx.tools.register(tool))
   }
   ctx.effect(() =>
