@@ -89,6 +89,7 @@ const buildTool = {
       coveragePath: str('coverage.json 路径，默认 .work/<批次>/coverage.json'),
       keepWork: { type: 'boolean', description: '保留 .work/<批次> 中间产物，默认 false（编完就删）' },
       keepVersions: { type: 'boolean', description: '同一批次重编时另起序号、保留旧版，默认 false（覆盖同名成品）' },
+      reviewed: str('没写过 coverage.json 时给：你确认看过的页，通常 all；写了就不必传'),
     },
   },
   timeoutMs: 600000,
@@ -96,13 +97,13 @@ const buildTool = {
     schema: OUTPUT,
     render: (_a, v) => text(
       v.ok
-        ? `出好了：${v.pdf}（${v.pages} 页）\n定义 ${v.counts.definitions} 条 · 定理 ${v.counts.theorems} 条 · 题型 ${v.counts.types} 类 · 题目 ${v.counts.problems} 道`
+        ? `出好了：${v.pdf}（${v.pages} 页）\n定义 ${v.counts.definitions} 条 · 定理 ${v.counts.theorems} 条 · 题型 ${v.counts.types} 类 · 题目 ${v.counts.problems} 道${v.warnings?.length ? '\n提醒：\n- ' + v.warnings.join('\n- ') : ''}`
         : `没出：${v.message}${v.errors?.length ? '\n' + v.errors.slice(0, 12).map((e) => '- ' + e).join('\n') : ''}${v.log ? '\n' + v.log : ''}`,
     ),
   },
   async execute(args) {
     const root = args.root || DEFAULT_ROOT
-    return build({ root, batch: args.batch, deckPath: args.deckPath, coveragePath: args.coveragePath, keepWork: Boolean(args.keepWork), keepVersions: Boolean(args.keepVersions) })
+    return build({ root, batch: args.batch, deckPath: args.deckPath, coveragePath: args.coveragePath, keepWork: Boolean(args.keepWork), keepVersions: Boolean(args.keepVersions), reviewed: args.reviewed })
   },
 }
 
