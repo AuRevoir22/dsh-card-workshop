@@ -18,7 +18,7 @@ const OUTPUT = { type: 'object', additionalProperties: true }
 const prepareTool = {
   name: 'cards_prepare',
   description:
-    '卡片工坊第一步：把源 PDF 拆成逐页文字和按需页图，放进母文件夹的 .work/<批次>/ 里，同时把校名、姓名、学号这类敏感信息替换掉。返回批次号，并写好 .work/<批次>/plan.md（段表、条目格式、覆盖记录写法都在里面）——动手前先读 plan.md，别在对话里另立格式。文字按每 10 页合并成 pages/part-XX.md，一次读一段，不要一页一页读。页图默认只给扫描页和文字层稀烂的页出（auto），其余页要看图用 cards_page_image。目标子文件夹不存在时返回 ok:false 和候选名，先问用户是打错了还是新建，得到答复再带 create:true 重跑。',
+    '卡片工坊第一步：拆页、脱敏，文字压掉空格后按 10 页一段写进 .work/<批次>/pages/，页图只给扫描页和乱码页出。返回批次号，并写好 plan.md——先读它再动手。目标子文件夹不存在时返回 ok:false 和候选名，先问用户打错了还是新建，得到答复再带 create:true 重跑。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -58,7 +58,7 @@ const prepareTool = {
 
 const listTool = {
   name: 'cards_list_folders',
-  description: '列出母文件夹下的子文件夹（两级），用来确认目标子文件夹的名字，或给用户挑。',
+  description: '列出母文件夹下的一级子文件夹（带上二级名字），用来确认目标子文件夹，或给用户挑。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -77,7 +77,7 @@ const listTool = {
 const buildTool = {
   name: 'cards_build',
   description:
-    '卡片工坊第三步：读 .work/<批次>/deck.json，或者 parts/*.json（分片写时用，会自动合并、按题型并题、重排卡号），加上 coverage.json，校验通过后排版并编译成卡片 PDF，落到目标子文件夹。校验包括：coverage 覆盖每一页且 reviewed:true、三类条目数与 deck 完全相等、题目 id 不重复、deck 里不能再有敏感信息。校验没过就返回 errors，不许跳过。同一批次重编会覆盖同名成品。报错指到某一张卡时，只改那个 part 里的对应条目，别整段重写。',
+    '读 .work/<批次>/deck.json，或 parts/*.json（自动合并、按题型并题、重排卡号），加 coverage.json，校验通过后排版并编译成卡片 PDF，落到目标子文件夹。校验项：覆盖每一页且 reviewed、三类条目数与 deck 相等、题目 id 不重复、无敏感信息。失败返回 errors，不许跳过。同批次重编覆盖同名成品；报错指到某张卡时只改对应那条。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -225,7 +225,7 @@ function apiHandler(req, res) {
 const coverageTool = {
   name: 'cards_coverage',
   description:
-    '从 parts/*.json 机械汇总每页抽到的条目数，写出 coverage.json。你只需要声明 reviewed（哪几页看过了，通常 all），不用手抄每页计数——数错了会卡住编译，抄一遍也不涨准确度。写完顺手报出哪些页一条都没抽到，回头确认那几页是不是本来就空。',
+    '从 parts 机械汇总每页条目数并写 coverage.json，你只需声明 reviewed（通常 all）。会顺手指出「正文很长却一条没抽到」的页——coverage 跟 deck 同源，对得上不算本事，那几页才是可能漏的。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -241,7 +241,7 @@ const coverageTool = {
     schema: OUTPUT,
     render: (_a, v) => text(
       v.ok
-        ? `coverage 写好了：${v.pages} 页，定义 ${v.counts.definitions} · 定理 ${v.counts.theorems} · 题目 ${v.counts.problems}。${v.empty.length ? `\n一条没抽到的页：${v.empty.join('、')}（确认这些页本来就空）` : ''}`
+        ? `coverage 写好了：${v.pages} 页，定义 ${v.counts.definitions} · 定理 ${v.counts.theorems} · 题目 ${v.counts.problems}。${v.empty.length ? `\n一条没抽到的页：${v.empty.join('、')}` : ''}${v.suspicious.length ? `\n⚠ 这几页正文很长却一条没抽到，回头看看：${v.suspicious.map((s) => `第 ${s.page} 页（${s.chars} 字符）`).join('、')}` : ''}`
         : `没写成：${v.message}`,
     ),
   },
@@ -252,7 +252,7 @@ const coverageTool = {
 
 const checkTool = {  name: 'cards_check',
   description:
-    '卡片工坊的体检：只报结论，不返回正文。核对覆盖率（页码是否 1..N 全覆盖、reviewed 是否都标了）、三类条目数与 deck 是否相等、题目 id 是否重复、题干有没有抄重、哪些页一条都没抽到、deck 里有没有敏感信息。写完 deck 先跑这个，通过了再 cards_build，别自己回头重读原文对数。',
+    '体检，只报结论不返正文：覆盖率、条目数、题号重复、题干抄重、内容多却抽空的页、deck 里的敏感信息。写完 deck 先跑它，过了再 cards_build。',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -281,7 +281,7 @@ const checkTool = {  name: 'cards_check',
 const pageImageTool = {
   name: 'cards_page_image',
   description:
-    '给某几页补出页图（默认只有扫描页和烂页有图）。文字层读不通、公式看不清时用。一次把一段（10 页内）的图都要齐，连着用 read_image 看完再动手写，别一页一个来回；已经读过的页不要再取。一页约 1000—1500 token，别整本都要。',
+    '给某几页补页图。文字层读不通、或页面有分式/积分/矩阵这种被文字层拍平的排版时用：一次把一段（10 页内）取齐，连着 read_image 看完再写，读过的别重取。一页约 1000—1500 token，别整本都要。',
   parameters: {
     type: 'object',
     additionalProperties: false,
