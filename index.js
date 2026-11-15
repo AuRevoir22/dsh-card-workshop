@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { join, normalize, sep } from 'node:path'
 import { DEFAULT_ROOT, listFolders, prepare, renderPageImages, sweepOldBatches } from './lib/prepare.js'
 import { build, checkDeck, writeCoverage } from './lib/build.js'
+import { readCourse, scopeText, writeCourse } from './lib/course.js'
 
 export const name = 'card-workshop'
 export const inject = ['tools', 'webServer']
@@ -334,8 +335,56 @@ const cleanupTool = {
   },
 }
 
+const courseTool = {
+  name: 'cards_course',
+  description:
+    '读写一个科目的教材与进度，存成 <母文件夹>/<科目>/课程.json。首次给某个科目生成卡片时，先问用户参考教材（书名+版次），自己去网上查目录，再问做到第几章第几节，然后用 set 写进来。之后 prepare 会把「该章节及之前」当成解题可用的知识范围。',
+  parameters: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['action'],
+    properties: {
+      action: str('get：读；set：写', { enum: ['get', 'set'] }),
+      subject: str('科目名，也就是母文件夹下的一级目录，例如「高等数学分析」'),
+      root: str('母文件夹绝对路径，默认 D:\\卡片库'),
+      textbook: str('参考教材，书名 + 版次，例如「《数学分析》陈纪修 第三版」'),
+      chapters: { type: 'array', items: { type: 'string' }, description: '教材章节目录，按顺序' },
+      current: { type: 'object', description: '这次做到哪里：{"chapter":"第二章 函数极限","section":"2.3 无穷小量与无穷大量"}' },
+      forbidden: { type: 'array', items: { type: 'string' }, description: '明确还不许用的方法，例如 ["泰勒展开","洛必达法则"]' },
+    },
+  },
+  timeoutMs: 20000,
+  output: {
+    schema: OUTPUT,
+    render: (_a, v) => text(v.ok ? v.message : '失败：' + v.message),
+  },
+  async execute(args) {
+    const root = args.root || DEFAULT_ROOT
+    const subject = String(args.subject || '').trim()
+    if (!subject) return { ok: false, message: '要给科目名（一级目录）' }
+    if (args.action === 'get') {
+      const c = readCourse(root, subject)
+      if (!c.found) return { ok: false, message: `${subject} 还没有 课程.json（${c.file || ''}）${c.reason ? '：' + c.reason : ''}` }
+      return { ok: true, message: `${subject}：${c.textbook || '（没写教材）'}\n范围：${scopeText(c)}` }
+    }
+    const prev = readCourse(root, subject)
+    const data = {
+      textbook: args.textbook || (prev.found ? prev.textbook : ''),
+      chapters: Array.isArray(args.chapters) && args.chapters.length ? args.chapters : prev.chapters || [],
+      current: args.current || prev.current || {},
+      forbidden: Array.isArray(args.forbidden) ? args.forbidden : prev.forbidden || [],
+      updatedAt: new Date().toISOString(),
+    }
+    if (!data.textbook || !data.chapters.length || !data.current || !data.current.chapter) {
+      return { ok: false, message: 'textbook、chapters、current.chapter 三样都要有，缺的补上再写' }
+    }
+    const file = writeCourse(root, subject, data)
+    return { ok: true, message: `写好了：${file}\n${scopeText({ found: true, ...data })}` }
+  },
+}
+
 export function apply(ctx) {
-  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool]) {
+  for (const tool of [prepareTool, listTool, buildTool, checkTool, coverageTool, pageImageTool, cleanupTool, courseTool]) {
     ctx.effect(() => ctx.tools.register(tool))
   }
   ctx.effect(() =>
