@@ -41,7 +41,7 @@ const prepareTool = {
     render: (_a, v) => text(
       v.ok
         ? (v.textUsable ? '' : `⚠ 文字层不可用：${v.brokenPages}/${v.totalPages} 页抽出来是乱码（字体没带 ToUnicode）。已按整本出图，pages/*.md 别读，直接 read_image img/page-XXX.png。\n`) +
-          `批次 ${v.batch}：${v.totalPages} 页（扫描页 ${v.scannedPages}，出图 ${v.imagePages} 页），目标 ${v.targetPath}${v.created ? '（新建）' : ''}。\n施工单：${v.plan}\n**开工前先问用户：这次做到第几章第几节**${v.course.found ? `（上次记的是「${v.course.last || '没写'}」）` : '（这个科目还没设教材，先问教材）'}，确认后用 cards_course 更新。\n正文 ${v.charCount} 字符（原始 ${v.rawCharCount}，压掉 ${Math.round((1 - v.charCount / Math.max(1, v.rawCharCount)) * 100)}%），分 ${v.parts.length} 段。\n脱敏：${v.redactions.map((r) => r.kind + '×' + r.count).join('、') || '无命中'}`
+          `批次 ${v.batch}：${v.totalPages} 页（扫描页 ${v.scannedPages}，出图 ${v.imagePages} 页），目标 ${v.targetPath}${v.created ? '（新建）' : ''}。\n施工单：${v.plan}\n**开工前先问用户两件事：这次做到第几章第几节**${v.course.found ? `（上次记的是「${v.course.last || '没写'}」）` : '（这个科目还没设教材，先问教材）'}**，以及这份文件想叫什么名字**（名字传给 cards_build 的 fileName）。\n正文 ${v.charCount} 字符（原始 ${v.rawCharCount}，压掉 ${Math.round((1 - v.charCount / Math.max(1, v.rawCharCount)) * 100)}%），分 ${v.parts.length} 段。\n脱敏：${v.redactions.map((r) => r.kind + '×' + r.count).join('、') || '无命中'}`
         : `没准备好：${v.message || v.code}${v.suggestions?.length ? '；母文件夹里相近的：' + v.suggestions.join('、') : ''}${v.ask ? '。' + v.ask : ''}`,
     ),
   },
@@ -92,6 +92,7 @@ const buildTool = {
       keepWork: { type: 'boolean', description: '保留 .work/<批次> 中间产物，默认 false（编完就删）' },
       keepVersions: { type: 'boolean', description: '同一批次重编时另起序号、保留旧版，默认 false（覆盖同名成品）' },
       reviewed: str('没写过 coverage.json 时给：你确认看过的页，通常 all；写了就不必传'),
+      fileName: str('用户给的文件名（不带 .pdf）。确认知识范围之后再问用户一句「这份文件叫什么名字」，把答复原样传进来；不问就用默认的「子文件夹-批次时间戳」命名'),
     },
   },
   timeoutMs: 600000,
@@ -105,7 +106,7 @@ const buildTool = {
   },
   async execute(args) {
     const root = args.root || DEFAULT_ROOT
-    return build({ root, batch: args.batch, deckPath: args.deckPath, coveragePath: args.coveragePath, keepWork: Boolean(args.keepWork), keepVersions: Boolean(args.keepVersions), reviewed: args.reviewed })
+    return build({ root, batch: args.batch, deckPath: args.deckPath, coveragePath: args.coveragePath, keepWork: Boolean(args.keepWork), keepVersions: Boolean(args.keepVersions), reviewed: args.reviewed, fileName: args.fileName })
   },
 }
 
@@ -429,7 +430,9 @@ const rebuildTool = {
     mkdirSync(work, { recursive: true })
     writeFileSync(join(work, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8')
     writeFileSync(join(work, 'deck.json'), readFileSync(deckPath))
-    return build({ root: manifest.root, batch, reviewed: 'all', keepVersions: Boolean(args.keepVersions) })
+    // 重编沿用成品现有的名字（deck 快照跟 PDF 同名）
+    const wanted = basename(deckPath).replace(/\.deck\.json$/i, '')
+    return build({ root: manifest.root, batch, reviewed: 'all', keepVersions: Boolean(args.keepVersions), fileName: wanted })
   },
 }
 

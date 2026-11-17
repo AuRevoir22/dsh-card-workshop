@@ -273,7 +273,7 @@ window.__ModuleLoader__.load({
           '目标子文件夹：' + (target || '（未选）'),
           '源文件：' + (picked.length ? picked.join('；') : '（未选）'),
           '',
-          '按卡片工坊流程走：①先 cards_course get 看这个科目有没有教材目录，没有就先问教材、上网查全目录（细到 x.y.z）、贴给我核对、写进去；目录只到 §x.y 也要先补全。②cards_prepare 拆页。③问这次做到哪一节并用 cards_course 记下。④读 plan.md 按段施工（一段读完立刻写 parts/NN.json）。⑤cards_build 带 reviewed:"all"。题型卡每段给识别/思路/易错，每题给识别/思路/步骤；开工前用任务清单把各段列上，做完挨个标完成。',
+          '按卡片工坊流程走：①先 cards_course get 看这个科目有没有教材目录，没有就先问教材、上网查全目录（细到 x.y.z）、贴给我核对、写进去；目录只到 §x.y 也要先补全。②cards_prepare 拆页。③问这次做到哪一节并用 cards_course 记下。④**再问一句「这份文件想叫什么名字」，把名字传给 cards_build 的 fileName**。⑤读 plan.md 按段施工（一段读完立刻写 parts/NN.json）。⑥cards_build 带 reviewed:"all" 和 fileName。题型卡每段给识别/思路/易错，每题给识别/思路/步骤和答案；开工前用任务清单把各段列上，做完挨个标完成。',
         ].join('\n')
 
         function start() {
