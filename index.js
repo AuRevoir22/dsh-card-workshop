@@ -420,7 +420,7 @@ const rebuildTool = {
     if (!existsSync(manFile)) return { ok: false, message: '找不到配套的 ' + basename(manFile) + '，没法确定落盘位置和页数' }
     let manifest
     try {
-      manifest = JSON.parse(readFileSync(manFile, 'utf8'))
+      manifest = JSON.parse(readFileSync(manFile, 'utf8').replace(/^\uFEFF/, ''))
     } catch (e) {
       return { ok: false, message: 'manifest 读不出来：' + e.message }
     }
