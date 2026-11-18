@@ -432,7 +432,7 @@ const rebuildTool = {
     writeFileSync(join(work, 'deck.json'), readFileSync(deckPath))
     // 重编沿用成品现有的名字（deck 快照跟 PDF 同名）
     const wanted = basename(deckPath).replace(/\.deck\.json$/i, '')
-    return build({ root: manifest.root, batch, reviewed: 'all', keepVersions: Boolean(args.keepVersions), fileName: wanted })
+    return build({ root: manifest.root, batch, reviewed: 'all', keepVersions: Boolean(args.keepVersions), fileName: wanted, refreshScope: false })
   },
 }
 
